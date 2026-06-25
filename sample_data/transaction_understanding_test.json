@@ -4,7 +4,7 @@
     "amount": -6.75,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Wants",
+      "category": "Food",
       "merchant_name": "Starbucks",
       "confidence_score": 1.0
     }
@@ -14,14 +14,14 @@
     "amount": -15.49,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Wants",
+      "category": "Entertainment",
       "merchant_name": "Netflix",
       "confidence_score": 1.0
     }
   },
   {
     "raw_description": "DIRECT DEP PAYROLL ACME CORP",
-    "amount": 3500.00,
+    "amount": 3500.0,
     "expected": {
       "transaction_type": "Income",
       "category": "Income",
@@ -31,20 +31,20 @@
   },
   {
     "raw_description": "ACH TRANSFER TO SAVINGS BANK OF AMERICA",
-    "amount": -500.00,
+    "amount": -500.0,
     "expected": {
       "transaction_type": "Transfer",
-      "category": "Savings",
+      "category": "Transfer",
       "merchant_name": "Savings Transfer",
       "confidence_score": 0.9
     }
   },
   {
     "raw_description": "FIDELITY INVESTMENTS BUY MUTUAL FUND",
-    "amount": -1000.00,
+    "amount": -1000.0,
     "expected": {
       "transaction_type": "Investment",
-      "category": "Savings",
+      "category": "Investment",
       "merchant_name": "Fidelity",
       "confidence_score": 0.9
     }
@@ -54,27 +54,27 @@
     "amount": 42.99,
     "expected": {
       "transaction_type": "Refund",
-      "category": "Wants",
+      "category": "Income",
       "merchant_name": "Amazon",
       "confidence_score": 0.9
     }
   },
   {
     "raw_description": "DEPT ED STUDENT LOAN PYMT #92842",
-    "amount": -250.00,
+    "amount": -250.0,
     "expected": {
       "transaction_type": "Loan/Debt",
-      "category": "Debt Payments",
+      "category": "Loan/Debt",
       "merchant_name": "Student Loan",
       "confidence_score": 0.9
     }
   },
   {
     "raw_description": "CONEDISON UTILITY BILL autopay",
-    "amount": -112.50,
+    "amount": -112.5,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Needs",
+      "category": "Housing",
       "merchant_name": "ConEd",
       "confidence_score": 0.9
     }
@@ -84,17 +84,17 @@
     "amount": -10.99,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Wants",
+      "category": "Entertainment",
       "merchant_name": "Spotify",
       "confidence_score": 1.0
     }
   },
   {
     "raw_description": "LANDLORD RENT TRANSFER",
-    "amount": -1600.00,
+    "amount": -1600.0,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Needs",
+      "category": "Housing",
       "merchant_name": "Rent",
       "confidence_score": 1.0
     }
@@ -104,24 +104,24 @@
     "amount": -14.25,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Wants",
+      "category": "Food",
       "merchant_name": "Chronic Tacos",
       "confidence_score": 1.0
     }
   },
   {
     "raw_description": "VANGUARD BUY ETF VTI",
-    "amount": -200.00,
+    "amount": -200.0,
     "expected": {
       "transaction_type": "Investment",
-      "category": "Savings",
+      "category": "Investment",
       "merchant_name": "Vanguard",
       "confidence_score": 0.9
     }
   },
   {
     "raw_description": "DIR DEP PAYROLL INTEREST",
-    "amount": 12.50,
+    "amount": 12.5,
     "expected": {
       "transaction_type": "Income",
       "category": "Income",
@@ -131,17 +131,17 @@
   },
   {
     "raw_description": "AMAZON VENDOR VTX284920",
-    "amount": -54.30,
+    "amount": -54.3,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Wants",
+      "category": "Shopping",
       "merchant_name": "Amazon",
       "confidence_score": 0.9
     }
   },
   {
     "raw_description": "UNKNOWN MERCHANDISE POS #92049",
-    "amount": -30.00,
+    "amount": -30.0,
     "expected": {
       "transaction_type": "Expense",
       "category": "Other",
@@ -151,7 +151,7 @@
   },
   {
     "raw_description": "MYSTERY INFLOW CREDIT",
-    "amount": 100.00,
+    "amount": 100.0,
     "expected": {
       "transaction_type": "Income",
       "category": "Income",
@@ -161,17 +161,17 @@
   },
   {
     "raw_description": "OVERRIDE TARGET STORE CHARGE",
-    "amount": -89.40,
+    "amount": -89.4,
     "expected": {
       "transaction_type": "Expense",
-      "category": "Needs",
+      "category": "Housing",
       "merchant_name": "Target",
       "confidence_score": 0.95
     }
   },
   {
     "raw_description": "OVERRIDE CUSTOM WORK INFLOW",
-    "amount": 450.00,
+    "amount": 450.0,
     "expected": {
       "transaction_type": "Income",
       "category": "Income",
@@ -181,22 +181,22 @@
   },
   {
     "raw_description": "DEBIT CARD CHASE HOME MORTGAGE #92842",
-    "amount": -1450.00,
+    "amount": -1450.0,
     "expected": {
       "transaction_type": "Loan/Debt",
-      "category": "Debt Payments",
+      "category": "Loan/Debt",
       "merchant_name": "Mortgage Payment",
       "confidence_score": 0.95
     }
   },
   {
     "raw_description": "REFUND GAP OUTLET ONLINE",
-    "amount": 25.00,
+    "amount": 25.0,
     "expected": {
       "transaction_type": "Refund",
-      "category": "Wants",
+      "category": "Income",
       "merchant_name": "Gap Outlet",
-      "confidence_score": 0.95
+      "confidence_score": 0.9
     }
   }
 ]

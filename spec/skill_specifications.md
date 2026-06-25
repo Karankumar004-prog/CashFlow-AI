@@ -26,7 +26,25 @@ This document defines the functional scope, interface contracts, logic design, a
      - `r".*FIDELITY.*|.*VANGUARD.*"` $\rightarrow$ Type: `Investment`.
      - `r".*PAYMENT.*|.*LOAN.*"` $\rightarrow$ Type: `Loan/Debt`.
    - **Step 3: Stored Override Memory**: Reads user-defined corrections from `user_memory.overrides` and applies them if a description matches.
-   - **Step 4: AI Fallback**: Gathers all unique remaining descriptions. Formulates a system prompt and calls Gemini 2.5 Flash to classify type, merchant, and category in a structured JSON response.
+   - **Step 4: AI Fallback**: Gathers all unique remaining descriptions and invokes Gemini 2.5 Flash using the following strict template layout:
+      ```text
+      SYSTEM: You are a Financial Data Extractor and Classifier. Your job is to analyze obscure or noisy bank transaction descriptions and map them to strict, predefined categories. 
+
+      You must return a single JSON object with exactly three keys: "transaction_type", "category", and "merchant_name".
+
+      RULES for "transaction_type": 
+      You must choose exactly one of the following: ["Income", "Expense", "Transfer", "Investment", "Loan/Debt", "Refund"].
+
+      RULES for "category":
+      You must choose exactly one of the following: ["Needs", "Wants", "Savings", "Debt Payments", "Income", "Other"].
+
+      RULES for "merchant_name":
+      Extract the clean, readable name of the vendor or counterparty. Strip out all transaction hashes, dates, city names, store numbers, and payment processor prefixes (e.g., "POS PUR", "UPI", "PAYPAL"). If it is an individual's name via a peer-to-peer transfer, capitalize it properly.
+
+      USER INPUT:
+      Description: {raw_description}
+      Amount: {amount}
+      ```
 4. **Transaction Type Semantics**:
    - **Income**: Increases cash balances (e.g., salary, refunds).
    - **Expense**: Discretionary/essential outflows.
@@ -122,8 +140,13 @@ This document defines the functional scope, interface contracts, logic design, a
 ### 4.2. Logic & Prompt Design
 We design a strict, low-token prompt that enforces structured JSON response schemas for the quick wins:
 
-```
-SYSTEM: You are a Financial Intelligence Coach. You analyze processed financial scores and behaviors. You never do math yourself; you rely entirely on the provided metrics. Do not provide specific investment suggestions.
+```text
+SYSTEM: You are a Financial Intelligence Coach. You analyze processed financial scores and behavioral metrics to provide actionable advice. 
+
+CONSTRAINTS:
+1. You never do math yourself; you rely entirely on the provided metrics.
+2. Do not provide specific investment suggestions (e.g., specific stocks, crypto, or tickers). Focus on cash flow management, debt reduction, and budget efficiency.
+3. Keep the tone empathetic but direct.
 
 USER PROFILE METRICS:
 - Financial Health Score: {financial_health_score}/100
@@ -131,12 +154,14 @@ USER PROFILE METRICS:
 - Debt Ratio (DTI): {debt_ratio}%
 - Emergency Runway: {runway} months
 - Asset Coverage: {asset_coverage}
-- Spending Concentration: {top_categories}
+- Top Spending Concentrations: {top_categories}
 - Behavioral Risk Flags: {risk_flags}
 
 TASK:
-1. Generate exactly 3 Actionable Quick Wins to improve these metrics. Return them as a JSON list.
-2. Generate a step-by-step goal roadmap in markdown. Keep it under 250 words.
+Return a JSON object with two keys: "quick_wins" and "roadmap".
+
+1. "quick_wins": A JSON list of exactly 3 actionable steps to immediately improve these metrics. Each step must have a "title" (string), "description" (string), and "potential_savings" (integer representing estimated monthly $ saved, or 0 if not applicable).
+2. "roadmap": A markdown-formatted string (under 250 words) outlining a step-by-step long-term plan tailored to the user's specific risks and ratios.
 ```
 
 ### 4.3. Testing Strategy
