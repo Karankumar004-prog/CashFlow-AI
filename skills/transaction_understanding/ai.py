@@ -15,9 +15,10 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     
     system_instruction = (
-        "You are a transaction classifier. I will provide a JSON list of transactions with 'description' and 'amount'. "
+        "You are a transaction classifier. I will provide a JSON list of transactions with 'description', 'amount', and sometimes 'csv_type' and 'csv_category'. "
         "Return a JSON dictionary where the keys are the exact raw descriptions, and the values are objects "
         "containing {'transaction_type': '...', 'category': '...', 'sub_category': '...', 'clean_merchant': '...', 'associated_person': '...'}.\n\n"
+        "USE THE CSV METADATA: If the bank provided a 'csv_category' or 'csv_type', use it as a strong hint for your classification.\n\n"
         "CRITICAL RULE: MONEY DIRECTION COMES FIRST:\n"
         "- If amount > 0 (Positive Cash Flow), 'transaction_type' MUST be exactly one of: ['Income', 'Refund', 'Transfer', 'Loan/Debt']\n"
         "- If amount < 0 (Negative Cash Flow), 'transaction_type' MUST be exactly one of: ['Expense', 'Investment', 'Transfer', 'Loan/Debt']\n\n"

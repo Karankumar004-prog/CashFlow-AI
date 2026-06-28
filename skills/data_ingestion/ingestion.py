@@ -43,7 +43,11 @@ def parse_csv_to_models(file_path: str) -> List[RawTransaction]:
             continue
         try:
             if isinstance(raw_date, str):
-                parsed_date = pd.to_datetime(raw_date, dayfirst=True).date()
+                import re
+                if re.match(r'^\d{4}-\d{2}-\d{2}', str(raw_date).strip()):
+                    parsed_date = pd.to_datetime(raw_date).date()
+                else:
+                    parsed_date = pd.to_datetime(raw_date, dayfirst=True).date()
             else:
                 parsed_date = raw_date
                 if hasattr(parsed_date, 'date'):

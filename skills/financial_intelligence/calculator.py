@@ -49,10 +49,12 @@ def calculate_ratios(
     avg_debt = abs_debt_txs / months_covered
     avg_investment = abs_investment_txs / months_covered
     avg_refund = abs_refund_txs / months_covered
-    avg_outflows = avg_expenses + avg_debt + avg_investment
+    
+    # Pure expenses that are not wealth-building
+    avg_non_wealth_outflows = avg_expenses + avg_debt
 
     if avg_income > 0:
-        savings_rate = (avg_income + avg_refund - avg_outflows) / avg_income
+        savings_rate = (avg_income + avg_refund - avg_non_wealth_outflows) / avg_income
     else:
         savings_rate = 0.0
         

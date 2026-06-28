@@ -7,92 +7,119 @@ def clean_transaction_description(raw_description: str) -> str:
     """
     if not raw_description:
         return ""
-        
-    # Convert to uppercase for standardization
+    
     desc = raw_description.upper()
     
-    # 1. Indian UPI Parsing (Updated via Ultimate System Sync Protocol)
-    if desc.startswith("UPI/"):
+    # 3. Interest, Cash, ATM
+    if "INT.PD" in desc:
+        return "INTEREST PAID"
+    elif desc.startswith("BY CASH") or desc.startswith("CASH DEP"):
+        return "CASH DEPOSIT"
+    elif desc.startswith("ATM DEP"):
+        return "ATM DEPOSIT"
+    elif desc.startswith("ATM WDR"):
+        return "ATM WITHDRAWAL"
+    elif "SMS CHRG" in desc or desc == "CHARGE":
+        return "BANK CHARGES"
+        
+    # 1. Indian UPI Parsing
+    if desc.startswith("UPI/") or desc.startswith("UPI-REV/"):
         parts = desc.split('/')
         if len(parts) >= 4:
-            # Determine if part[4] is a name or a handle/domain
-            last_part = parts[4].strip() if len(parts) >= 5 else ""
-            handle_markers = ['@', 'OKHDFCBANK', 'OKAXIS', 'OKICICI', 'YBL', 'IBL', 'SBI', 'PAYTM', 'HPV', 'OK']
-            if len(last_part) <= 3 or any(m in last_part for m in handle_markers):
-                name_str = parts[3]
-            else:
-                name_str = last_part
-            
-            # Strip leading phone IDs and email handles
-            name_str = re.sub(r'^\d+\s+', '', name_str).strip()
-            if '@' in name_str:
-                name_str = name_str.split('@')[0]
-            desc = name_str.strip()
-            
-    # 2. Bank String Cleanup (Updated via Ultimate System Sync Protocol)
+            # Format A: UPI/ID/P2M/PHONE   VPA/SUFFIX
+            # Format B: UPI/ID/P2M/VPA@BANK/NAME
+            # Check if parts[3] has space (likely Format A)
+            if "   " in parts[3]:
+                # Format A
+                p3 = parts[3].strip()
+                sub_parts = p3.split()
+                if len(sub_parts) > 1:
+                    desc = sub_parts[-1] # take the vpa
+                else:
+                    desc = p3
+                if '@' in desc:
+                    desc = desc.split('@')[0]
+            elif len(parts) >= 5:
+                # Format B
+                vpa = parts[3]
+                name = parts[4].strip()
+                # If name is highly truncated, fallback to VPA
+                if len(name) <= 4 and '@' in vpa:
+                    name = vpa.split('@')[0]
+                desc = name
+                
+            # clean leading digits (like phone numbers)
+            desc = re.sub(r'^\d+\s*', '', desc)
+
+    # 2. NEFT / IMPS / RTGS / ACH
     elif desc.startswith("NEFT"):
+        if "CMS" in desc:
+            parts = desc.split('/')
+            if len(parts) >= 3:
+                desc = parts[-1].strip()
+        else:
+            desc = desc.replace("NEFT", "").strip()
+            desc = re.sub(r"^NEFT_IN\s*:\s*", "", desc)
+            
+    elif desc.startswith("IMPS-IN/"):
         parts = desc.split('/')
-        if len(parts) > 1: desc = parts[-1].strip()
+        if len(parts) >= 4:
+            desc = parts[3].strip()
+            
     elif desc.startswith("ACH/"):
         parts = desc.split('/')
-        if len(parts) >= 2: desc = parts[1].strip()
-        
-    # 3. Personal Shorthand Cleanup (Remove people's names after colons)
+        if len(parts) >= 2:
+            desc = parts[1].strip()
+            
+    elif desc.startswith("NPCI/ECS"):
+        parts = desc.split('/')
+        if len(parts) >= 5:
+            desc = parts[4].strip()
+            
+    # 4. Personal Shorthand (e.g. Books: Raj, Books for Raj, Books, Raj)
     if ":" in desc:
         parts = desc.split(':')
-        # Assuming the first part is the item and the second is the person
         desc = parts[0].strip()
+    elif "," in desc:
+        parts = desc.split(',')
+        desc = parts[0].strip()
+    elif " FOR " in desc:
+        desc = desc.split(" FOR ")[0].strip()
 
-    # 4. Strip common payment processor prefixes
+    # 5. Strip common prefixes
     prefixes = [
-        r"^POS PUR\s+",
-        r"^DEBIT CARD PURCHASE\s+",
-        r"^DEBIT CARD\s+",
-        r"^CHECK CARD\s+",
-        r"^ACH WITHDRAWAL\s+",
-        r"^ONLINE PAYMENT\s+",
-        r"^PAYPAL\s+",
-        r"^UPI\s+",
-        r"^POS\s+",
-        r"^DEBIT\s+",
-        r"^CREDIT\s+",
-        r"^W/D\s+",
-        r"^ACH\s+",
-        r"^ONLINE\s+",
-        r"^ONLINE TRANSFER\s+",
-        r"^OVERRIDE\s+"
+        r"^POS PUR\s+", r"^DEBIT CARD PURCHASE\s+", r"^DEBIT CARD\s+", r"^CHECK CARD\s+",
+        r"^ACH WITHDRAWAL\s+", r"^ONLINE PAYMENT\s+", r"^PAYPAL\s+", r"^UPI\s+",
+        r"^POS\s+", r"^DEBIT\s+", r"^CREDIT\s+", r"^W/D\s+", r"^ACH\s+",
+        r"^ONLINE\s+", r"^ONLINE TRANSFER\s+", r"^OVERRIDE\s+"
     ]
     for pattern in prefixes:
         desc = re.sub(pattern, "", desc)
-        
-    # 5. Strip transaction numbers, hashes, and generic store numbers (e.g. #1249 or 92049)
+
+    # 6. Strip transaction numbers, hashes
     desc = re.sub(r"#\s*\d+", "", desc)
     desc = re.sub(r"\b\d{4,}\b", "", desc)
-    
-    # 6. Clean punctuation and collapse multiple spaces into single space
-    # (Must do this before city/state checks so lookbehinds see standard single spacing)
+
+    # 7. Clean punctuation and spaces (except dot and hyphen)
     desc = re.sub(r"[^\w\s\-\.]", " ", desc)
-    desc = re.sub(r"\s+", " ", desc)
     
-    # 7. Strip trailing city names preceding state codes (e.g. "SEATTLE WA" or "ALISO VIEJO CA")
+    # Strip trailing city names preceding state codes (e.g. "SEATTLE WA" or "ALISO VIEJO CA")
     # Enforces that there must be at least one preceding word so we don't clear the whole string.
     states = r"(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)"
     desc = re.sub(r"(?<=\w\s)\b(?:[A-Z\-\.]+\s+){1,2}" + states + r"$", "", desc)
     
-    # 8. Strip state code if it is trailing by itself at the end
+    # Strip state code if it is trailing by itself at the end
     desc = re.sub(r"\b" + states + r"$", "", desc)
     
-    # 9. Strip generic transaction words that clutter the merchant name
+    desc = re.sub(r"\b\.COM\b", "", desc)
+
     generic_words = [
         r"\bSTORE\b", r"\bVENDOR\b", r"\bSUB\b", r"\bCHARGE\b", 
         r"\bEPAYMENT\b", r"\bPYMT\b", r"\bAUTOPAY\b", r"\bON-LINE\b", 
-        r"\bONLINE\b", r"\bWWW\.\b", r"\b.COM\b", 
-        r"\bBILL\b", r"\bPOS\b"
+        r"\bONLINE\b", r"\bWWW\.\b", r"\bBILL\b", r"\bPOS\b"
     ]
     for pattern in generic_words:
         desc = re.sub(pattern, "", desc)
         
-    # 10. Final clean up of spacing
     desc = re.sub(r"\s+", " ", desc)
-    
     return desc.strip()

@@ -83,6 +83,43 @@ def _map_csv_metadata(raw_tx: RawTransaction):
             
     return mapped_type, mapped_cat
 
+def enrich_transaction_metadata(ptx: ProcessedTransaction) -> ProcessedTransaction:
+    cat = str(ptx.category).lower()
+    sub_cat = str(getattr(ptx, 'sub_category', '')).lower()
+    type_str = str(ptx.transaction_type).lower()
+    
+    # 1. Map Financial Impact
+    if type_str == 'income':
+        ptx.financial_impact = 'Income'
+    elif type_str == 'transfer':
+        ptx.financial_impact = 'Neutral/Transfer'
+    elif cat in ['investment', 'savings']:
+        ptx.financial_impact = 'Wealth Building'
+    elif cat in ['bills', 'rent', 'loan/debt', 'utilities']:
+        ptx.financial_impact = 'Fixed Expense'
+    else:
+        ptx.financial_impact = 'Variable Expense'
+        
+    # 2. Map Intent
+    if type_str == 'income':
+        ptx.intent = 'Income'
+    elif cat in ['investment', 'savings']:
+        ptx.intent = 'Wealth Building'
+    elif cat in ['medical', 'health']:
+        ptx.intent = 'Health'
+    elif cat in ['transport', 'bills', 'groceries'] or 'grocery' in sub_cat:
+        ptx.intent = 'Essential'
+    elif cat in ['shopping', 'food', 'entertainment', 'dining out', 'personal care']:
+        ptx.intent = 'Lifestyle'
+    elif cat == 'loan/debt':
+        ptx.intent = 'Debt Repayment'
+    else:
+        # If it's still 'Other', try to infer from sub-category or fallback to Uncategorized
+        ptx.intent = 'Lifestyle' if 'cafe' in sub_cat else 'Uncategorized'
+        
+    return ptx
+
+
 def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> ProcessedTransaction:
     """
     Orchestrates the multi-stage matching pipeline evaluating cash flow direction FIRST.
@@ -121,22 +158,24 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
             running_balance=raw_tx.running_balance
         )
         
-    # Stage B: Regex patterns
-    regex_match = regex.match_regex_patterns(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
-    if regex_match:
-        ptx = regex_match
-        
-    # Stage C: Exact rules
-    rule_match = rules.match_exact_rule(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
-    if rule_match:
-        ptx = rule_match
-        
-    # Stage D: User memory override
+    # Stage B: User memory override (Highest Priority)
     mem_match = memory.match_user_memory(clean_desc, overrides_dict, amount, raw_tx.date, raw_tx.raw_description)
     if mem_match:
         ptx = mem_match
         
-    # Default Fallback if nothing matched
+    # Stage C: Exact rules
+    if not ptx:
+        rule_match = rules.match_exact_rule(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
+        if rule_match:
+            ptx = rule_match
+            
+    # Stage D: Regex patterns
+    if not ptx:
+        regex_match = regex.match_regex_patterns(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
+        if regex_match:
+            ptx = regex_match
+        
+    # Stage F: Default Fallback if nothing matched
     if not ptx:
         if amount > 0:
             tx_type = TransactionType.INCOME
@@ -185,4 +224,5 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
     else:
         ptx.classification_reason = "Passed all validation checks."
 
+    ptx = enrich_transaction_metadata(ptx)
     return ptx

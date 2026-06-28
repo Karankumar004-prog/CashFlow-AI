@@ -216,9 +216,14 @@ def run_pipeline(raw_txs, overrides, api_key, liquid_assets, total_assets, total
     # E. Apply AI Mappings
     final_transactions = []
     for ptx in first_pass_txs:
-        if ptx.confidence_score == 0.0 and ptx.raw_description in ai_mappings:
+        if ptx.confidence_score <= 0.0 and ptx.raw_description in ai_mappings:
             ai_data = ai_mappings[ptx.raw_description]
-            ptx.transaction_type = ai_data.get("transaction_type", ptx.transaction_type)
+            proposed_type = ai_data.get("transaction_type", ptx.transaction_type)
+            if ptx.amount > 0 and proposed_type not in ["Income", "Refund", "Transfer", "Loan/Debt"]:
+                proposed_type = "Income"
+            elif ptx.amount < 0 and proposed_type not in ["Expense", "Investment", "Transfer", "Loan/Debt"]:
+                proposed_type = "Expense"
+            ptx.transaction_type = proposed_type
             ptx.category = ai_data.get("category", ptx.category)
             ptx.sub_category = ai_data.get("sub_category", ptx.sub_category)
             ptx.clean_merchant = ai_data.get("clean_merchant", ptx.clean_merchant)
@@ -498,7 +503,12 @@ if uploaded_file is not None:
                 for tx in raw_txs:
                     ptx = process_transaction(tx, overrides_dict=state.user_memory.get("overrides", {}))
                     if ptx.confidence_score <= 0.0:
-                        unknown_tx_map[ptx.raw_description] = {"description": ptx.raw_description, "amount": ptx.amount}
+                        unknown_tx_map[ptx.raw_description] = {
+                            "description": ptx.raw_description, 
+                            "amount": ptx.amount,
+                            "csv_type": tx.csv_type,
+                            "csv_category": tx.csv_category
+                        }
                     first_pass_txs.append(ptx)
                     
                 st.session_state["audit_partial_data"]["first_pass_txs"] = first_pass_txs
@@ -565,7 +575,12 @@ if uploaded_file is not None:
                 for ptx in first_pass_txs:
                     if ptx.confidence_score <= 0.0 and ptx.raw_description in ai_mappings:
                         ai_data = ai_mappings[ptx.raw_description]
-                        ptx.transaction_type = ai_data.get("transaction_type", ptx.transaction_type)
+                        proposed_type = ai_data.get("transaction_type", ptx.transaction_type)
+                        if ptx.amount > 0 and proposed_type not in ["Income", "Refund", "Transfer", "Loan/Debt"]:
+                            proposed_type = "Income"
+                        elif ptx.amount < 0 and proposed_type not in ["Expense", "Investment", "Transfer", "Loan/Debt"]:
+                            proposed_type = "Expense"
+                        ptx.transaction_type = proposed_type
                         ptx.category = ai_data.get("category", ptx.category)
                         ptx.sub_category = ai_data.get("sub_category", ptx.sub_category)
                         ptx.clean_merchant = ai_data.get("clean_merchant", ptx.clean_merchant)
@@ -765,9 +780,9 @@ if st.session_state["audit_completed"]:
             sav_rate = ratios.get("savings_rate", 0.0) * 100.0
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-label">Savings Rate</div>
+                <div class="metric-label">Monthly Savings</div>
                 <div class="metric-value" style="color: {'#10B981' if sav_rate >= 20.0 else '#EF4444'}">{sav_rate:.1f}%</div>
-                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: >= 20%</div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: Save >= 20%</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -776,9 +791,9 @@ if st.session_state["audit_completed"]:
             debt_rate = ratios.get("debt_ratio", 0.0) * 100.0
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-label">Debt Ratio (DTI)</div>
+                <div class="metric-label">Debt Burden</div>
                 <div class="metric-value" style="color: {'#10B981' if debt_rate <= 15.0 else '#EF4444'}">{debt_rate:.1f}%</div>
-                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: <= 15%</div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: Keep <= 15%</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -787,21 +802,20 @@ if st.session_state["audit_completed"]:
             runway_val = ratios.get("emergency_runway_months", 0.0)
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-label">Runway</div>
+                <div class="metric-label">Emergency Fund</div>
                 <div class="metric-value" style="color: {'#10B981' if runway_val >= 6.0 else '#EF4444'}">{runway_val:.1f} mo</div>
-                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: >= 6.0 mo</div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: >= 6.0 months</div>
             </div>
             """, unsafe_allow_html=True)
             
-        # Asset Coverage Card
         with m_col4:
             coverage = ratios.get("asset_coverage", 999.0)
-            cov_val = f"{coverage:.2f}" if coverage < 999.0 else "No Debt"
+            cov_val = f"{coverage:.2f}x" if coverage < 999.0 else "No Debt!"
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-label">Asset Coverage</div>
+                <div class="metric-label">Safety Net</div>
                 <div class="metric-value" style="color: {'#10B981' if coverage >= 3.0 or coverage >= 999.0 else '#EF4444'}">{cov_val}</div>
-                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: >= 3.00</div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem; color: #94A3B8;">Target: Assets >= 3x Debt</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -830,7 +844,7 @@ if st.session_state["audit_completed"]:
                     y=alt.Y("category:N", title="Budget Category", sort="-x"),
                     color=alt.Color(
                         "category:N", 
-                        scale=alt.Scale(scheme="purples"),
+                        scale=alt.Scale(scheme="category20b"),
                         legend=None
                     )
                 ).properties(
@@ -1045,7 +1059,18 @@ if st.session_state["audit_completed"]:
             st.session_state["audit_partial_data"] = {}
             st.session_state["audit_completed"] = False
             st.rerun()
-            
+
+        st.markdown("---")
+        st.markdown("### 💾 Export Ledger Data")
+        csv_data = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Categorized Ledger (.csv)",
+            data=csv_data,
+            file_name="CashFlow_Ledger_Export.csv",
+            mime="text/csv",
+            help="Download all processed transactions as a CSV file for your own spreadsheet."
+        )
+
     with tab_report:
         st.markdown("### 📄 Final Financial Report")
         st.markdown(report_md)
