@@ -15,13 +15,15 @@ INTENT_IMPACT_MAPPING = {
         "Clothing": ("Lifestyle", "Variable Expense"),
         "Electronics": ("Lifestyle", "Variable Expense"),
         "Books": ("Education", "Variable Expense"),
+        "Personal Care": ("Lifestyle", "Variable Expense"),
         "General": ("Lifestyle", "Variable Expense")
     },
     "Medical": {
-        "Medicine": ("Health", "Variable Expense"),
-        "Pharmacy": ("Health", "Variable Expense"),
-        "Consultation": ("Health", "Variable Expense"),
-        "Hospital": ("Health", "Variable Expense")
+        "Medicine": ("Health Care", "Variable Expense"),
+        "Pharmacy": ("Health Care", "Variable Expense"),
+        "Consultation": ("Health Care", "Variable Expense"),
+        "Personal Care": ("Lifestyle", "Variable Expense"),
+        "Hospital": ("Health Care", "Variable Expense")
     },
     "Housing": {
         "Rent": ("Essential", "Fixed Expense"),
@@ -51,12 +53,14 @@ INTENT_IMPACT_MAPPING = {
         "Refund": ("Essential", "Cash Transfer")
     },
     "Transfer": {
-        "Family": ("Family Support", "Cash Transfer"),
+        "Relational Expense": ("Lending/Sharing", "Cash Transfer"),
         "Self": ("Essential", "Cash Transfer")
     },
     "Loan/Debt": {
         "EMI": ("Debt Payment", "Liability Reduction"),
-        "Credit Card": ("Debt Payment", "Liability Reduction")
+        "Credit Card": ("Debt Payment", "Liability Reduction"),
+        "Lending": ("Lending/Sharing", "Cash Transfer"),
+        "Loan Repayment": ("Debt Payment", "Cash Transfer")
     }
 }
 
