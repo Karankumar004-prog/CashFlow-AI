@@ -536,35 +536,34 @@ if uploaded_file is not None:
                 
             elif stage == 2.1:
                 chunks = st.session_state["audit_partial_data"]["ai_chunks"]
-                idx = st.session_state["audit_partial_data"]["current_chunk_idx"]
                 
                 if st.session_state["audit_status"] == "CANCELLING":
                     st.session_state["audit_stage"] = 2.2
                     st.rerun()
                 
-                if idx < len(chunks):
-                    chunk = chunks[idx]
-                    if api_key and api_key != "mock":
+                if api_key and api_key != "mock":
+                    from skills.transaction_understanding.ai import batch_classify_transactions
+                    import time
+                    
+                    all_mappings = {}
+                    progress_placeholder = st.empty()
+                    
+                    for i, chunk in enumerate(chunks):
+                        progress_placeholder.info(f"🧠 AI Categorization: Processing chunk {i+1} of {len(chunks)}...")
                         try:
-                            from skills.transaction_understanding.ai import batch_classify_transactions
-                            chunk_mappings = batch_classify_transactions(chunk, api_key=api_key)
-                            st.session_state["audit_partial_data"]["ai_mappings"].update(chunk_mappings)
+                            chunk_mappings = batch_classify_transactions(chunk, api_key)
+                            all_mappings.update(chunk_mappings)
+                            if i < len(chunks) - 1:
+                                time.sleep(4)
                         except Exception as e:
                             import streamlit as st
-                            st.toast(f"⚠️ AI Categorization Failed on chunk {idx+1}: {e}. Proceeding with what we have.")
-                            st.session_state["audit_partial_data"]["current_chunk_idx"] = len(chunks)
-                    
-                    st.session_state["audit_partial_data"]["current_chunk_idx"] += 1
-                    
-                    if st.session_state["audit_partial_data"]["current_chunk_idx"] < len(chunks):
-                        st.session_state["audit_progress_text"] = f"Stage 2: AI Categorization (Chunk {st.session_state['audit_partial_data']['current_chunk_idx']+1} of {len(chunks)})..."
-                        st.rerun()
-                    else:
-                        st.session_state["audit_stage"] = 2.2
-                        st.rerun()
-                else:
-                    st.session_state["audit_stage"] = 2.2
-                    st.rerun()
+                            st.toast(f"⚠️ AI Categorization Failed on chunk {i+1}: {e}. Proceeding with what we have.")
+                            
+                    progress_placeholder.empty()
+                    st.session_state["audit_partial_data"]["ai_mappings"].update(all_mappings)
+                
+                st.session_state["audit_stage"] = 2.2
+                st.rerun()
 
             elif stage == 2.2:
                 state = st.session_state["audit_partial_data"]["state"]
@@ -607,20 +606,10 @@ if uploaded_file is not None:
                 state = st.session_state["audit_partial_data"]["state"]
                 raw_txs = st.session_state["raw_txs"]
                 
-                if liquid_assets == 0.0:
-                    if len(raw_txs) > 0:
-                        dynamic_liquid_assets = raw_txs[-1].running_balance
-                    else:
-                        dynamic_liquid_assets = 0.0
-                else:
-                    dynamic_liquid_assets = liquid_assets
-                    
-                dynamic_total_assets = total_assets if total_assets > 0.0 else dynamic_liquid_assets
-                
                 state = run_financial_analysis(
                     state=state,
-                    liquid_assets=dynamic_liquid_assets,
-                    total_assets=dynamic_total_assets,
+                    liquid_assets=liquid_assets,
+                    total_assets=total_assets,
                     total_liabilities=total_liabilities
                 )
                 st.session_state["audit_partial_data"]["state"] = state
@@ -698,6 +687,9 @@ if uploaded_file is not None:
                 st.rerun()
 
         except Exception as e:
+            from streamlit.runtime.scriptrunner import RerunException
+            if isinstance(e, RerunException):
+                raise e
             st.session_state["audit_status"] = "FAILED"
             st.error(f"Error during pipeline execution at Stage {st.session_state['audit_stage']}: {e}")
             st.stop()

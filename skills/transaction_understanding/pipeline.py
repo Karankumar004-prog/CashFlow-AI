@@ -174,8 +174,11 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
         regex_match = regex.match_regex_patterns(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
         if regex_match:
             ptx = regex_match
+            
+    # Note: Stage E (AI Fallback) is executed asynchronously in app.py
         
-    # Stage F: Default Fallback if nothing matched
+    # Stage E: Default Fallback if nothing matched
+    # Stage E: Default Fallback
     if not ptx:
         if amount > 0:
             tx_type = TransactionType.INCOME
@@ -203,12 +206,12 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
         if amount > 0 and ptx.transaction_type == TransactionType.EXPENSE:
             ptx.transaction_type = TransactionType.REFUND
             
-        if amount < 0 and ptx.transaction_type == TransactionType.INCOME:
+        elif amount < 0 and ptx.transaction_type == TransactionType.INCOME:
             ptx.transaction_type = TransactionType.EXPENSE
             
         # Ensure it's in allowed types, otherwise fallback
         if ptx.transaction_type not in allowed_types:
-            ptx.transaction_type = allowed_types[0]
+            ptx.transaction_type = allowed_types[0] if allowed_types else TransactionType.EXPENSE
             ptx.confidence_score *= 0.5  # Penalize confidence for type correction
 
     # Extract associated person
