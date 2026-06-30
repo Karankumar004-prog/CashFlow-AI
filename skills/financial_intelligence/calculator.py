@@ -87,7 +87,12 @@ def calculate_ratios(
     else:
         asset_coverage = 999.0
         
-    net_absolute_cash_flow = abs_income_txs - abs_total_expenses
+    # Total money leaving the ecosystem
+    total_outflows = abs_total_expenses + abs_debt_txs + abs_investment_txs
+    # Total money entering the ecosystem
+    total_inflows = abs_income_txs + abs_refund_txs
+    
+    net_absolute_cash_flow = total_inflows - total_outflows
         
     return {
         "savings_rate": savings_rate,
@@ -95,10 +100,10 @@ def calculate_ratios(
         "emergency_runway_months": emergency_runway,
         "asset_coverage": asset_coverage,
         "net_cash_flow": net_absolute_cash_flow,
-        "monthly_income": avg_income,         # Kept for backwards compatibility but we use absolute_income in UI now
-        "total_expenses": avg_expenses,       # Kept for backwards compatibility
-        "total_absolute_income": abs_income_txs,
-        "total_absolute_expenses": abs_total_expenses,
+        "monthly_income": avg_income,
+        "total_expenses": avg_expenses,
+        "total_absolute_income": total_inflows,
+        "total_absolute_expenses": total_outflows,
         "net_absolute_cash_flow": net_absolute_cash_flow,
         "months_covered": months_covered
     }

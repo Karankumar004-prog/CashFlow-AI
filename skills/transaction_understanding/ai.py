@@ -90,11 +90,19 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
                     clean_text = clean_text[:-3]
                 clean_text = clean_text.strip()
                 
-                result_dict = json.loads(clean_text)
+                try:
+                    result_dict = json.loads(clean_text)
+                except json.JSONDecodeError as e:
+                    print(f"JSON Parse Error. Raw output: {clean_text}")
+                    raise RuntimeError(f"AI returned invalid JSON: {e}")
                 
-                # Pass token usage along in a special key if we want telemetry, 
-                # but for now just return the dictionary
-                return result_dict
+                usage = res_data.get("usageMetadata", {})
+                usage_dict = {
+                    "promptTokenCount": usage.get("promptTokenCount", 0),
+                    "candidatesTokenCount": usage.get("candidatesTokenCount", 0)
+                }
+                
+                return result_dict, usage_dict
         except urllib.error.HTTPError as e:
             if e.code in [503, 500, 429, 504] and attempt < max_retries - 1:
                 time.sleep((2 ** attempt) + 1)  # Exponential backoff: 2s, 3s, 5s, 9s
@@ -106,4 +114,4 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
                 continue
             raise RuntimeError(f"API Call failed: {e}")
             
-    return {}
+    return {}, {}

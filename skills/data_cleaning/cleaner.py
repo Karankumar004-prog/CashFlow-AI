@@ -48,8 +48,10 @@ def clean_transaction_description(raw_description: str) -> str:
                     name = vpa.split('@')[0]
                 desc = name
                 
-            # clean leading digits (like phone numbers)
-            desc = re.sub(r'^\d+\s*', '', desc)
+            # Clean leading digits only if followed by a space (preserves raw phone numbers)
+            cleaned_desc = re.sub(r'^\d+\s+', '', desc)
+            if cleaned_desc.strip() != "":
+                desc = cleaned_desc
 
     # 2. NEFT / IMPS / RTGS / ACH
     elif desc.startswith("NEFT"):
@@ -83,8 +85,6 @@ def clean_transaction_description(raw_description: str) -> str:
     elif "," in desc:
         parts = desc.split(',')
         desc = parts[0].strip()
-    elif " FOR " in desc:
-        desc = desc.split(" FOR ")[0].strip()
 
     # 5. Strip common prefixes
     prefixes = [

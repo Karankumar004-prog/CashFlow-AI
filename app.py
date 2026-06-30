@@ -361,8 +361,20 @@ if uploaded_file is not None:
                     for i, chunk in enumerate(chunks):
                         progress_placeholder.info(f"🧠 AI Categorization: Processing chunk {i+1} of {len(chunks)}...")
                         try:
-                            chunk_mappings = batch_classify_transactions(chunk, api_key)
+                            chunk_mappings, chunk_usage = batch_classify_transactions(chunk, api_key)
                             all_mappings.update(chunk_mappings)
+                            
+                            prompt_per_tx = chunk_usage.get("promptTokenCount", 0) // len(chunk) if chunk else 0
+                            cand_per_tx = chunk_usage.get("candidatesTokenCount", 0) // len(chunk) if chunk else 0
+                            
+                            if "ai_usage" not in st.session_state["audit_partial_data"]:
+                                st.session_state["audit_partial_data"]["ai_usage"] = {}
+                                
+                            for desc in chunk_mappings.keys():
+                                st.session_state["audit_partial_data"]["ai_usage"][desc] = {
+                                    "prompt_tokens": prompt_per_tx,
+                                    "candidates_tokens": cand_per_tx
+                                }
                             if i < len(chunks) - 1:
                                 time.sleep(4)
                         except Exception as e:
@@ -399,6 +411,10 @@ if uploaded_file is not None:
                         ptx.intent, ptx.financial_impact = derive_intent_and_impact(ptx.category, ptx.sub_category)
                         ptx.confidence_score = 0.8
                         ptx.classification_method = "ai_fallback"
+                        
+                        usage = st.session_state["audit_partial_data"].get("ai_usage", {}).get(ptx.raw_description, {})
+                        ptx.prompt_tokens = usage.get("prompt_tokens", 0)
+                        ptx.candidates_tokens = usage.get("candidates_tokens", 0)
                     final_transactions.append(ptx)
                     
                 state.processed_data["transactions"] = final_transactions
