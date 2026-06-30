@@ -88,35 +88,30 @@ def enrich_transaction_metadata(ptx: ProcessedTransaction) -> ProcessedTransacti
     sub_cat = str(getattr(ptx, 'sub_category', '')).lower()
     type_str = str(ptx.transaction_type).lower()
     
-    # 1. Map Financial Impact
-    if type_str == 'income':
-        ptx.financial_impact = 'Income'
-    elif type_str == 'transfer':
-        ptx.financial_impact = 'Neutral/Transfer'
-    elif cat in ['investment', 'savings']:
-        ptx.financial_impact = 'Wealth Building'
-    elif cat in ['bills', 'rent', 'loan/debt', 'utilities']:
-        ptx.financial_impact = 'Fixed Expense'
-    else:
-        ptx.financial_impact = 'Variable Expense'
-        
-    # 2. Map Intent
-    if type_str == 'income':
-        ptx.intent = 'Income'
-    elif cat in ['investment', 'savings']:
-        ptx.intent = 'Wealth Building'
-    elif cat in ['medical', 'health']:
-        ptx.intent = 'Health'
-    elif cat in ['transport', 'bills', 'groceries'] or 'grocery' in sub_cat:
-        ptx.intent = 'Essential'
-    elif cat in ['shopping', 'food', 'entertainment', 'dining out', 'personal care']:
-        ptx.intent = 'Lifestyle'
-    elif cat == 'loan/debt':
-        ptx.intent = 'Debt Repayment'
-    else:
-        # If it's still 'Other', try to infer from sub-category or fallback to Uncategorized
-        ptx.intent = 'Lifestyle' if 'cafe' in sub_cat else 'Uncategorized'
-        
+    # Fill missing or "Uncategorized" Intent
+    if not getattr(ptx, 'intent', None) or ptx.intent.lower() == 'uncategorized':
+        if type_str == 'income': ptx.intent = 'Income'
+        elif type_str == 'transfer': ptx.intent = 'Transfer/Routing'
+        elif cat in ['investment', 'savings']: ptx.intent = 'Wealth Building'
+        elif cat in ['medical', 'health']: ptx.intent = 'Health'
+        elif cat in ['transport', 'groceries', 'housing', 'bills']: ptx.intent = 'Essential'
+        elif cat in ['shopping', 'food', 'entertainment', 'personal care']: ptx.intent = 'Lifestyle'
+        elif cat == 'loan/debt': ptx.intent = 'Debt Repayment'
+        else: ptx.intent = 'General'
+
+    # Fill missing or "Uncategorized" Financial Impact
+    if not getattr(ptx, 'financial_impact', None) or ptx.financial_impact.lower() == 'uncategorized':
+        if type_str == 'income': ptx.financial_impact = 'Income'
+        elif type_str == 'transfer': ptx.financial_impact = 'Neutral/Transfer'
+        elif cat in ['investment', 'savings']: ptx.financial_impact = 'Wealth Building'
+        elif cat in ['bills', 'rent']: ptx.financial_impact = 'Fixed Expense'
+        else: ptx.financial_impact = 'Variable Expense'
+
+    # Hard overwrite for any Category that came back as Uncategorized
+    if ptx.category.lower() == 'uncategorized':
+        ptx.category = 'Other'
+        ptx.sub_category = 'Miscellaneous'
+
     return ptx
 
 

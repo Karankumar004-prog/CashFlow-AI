@@ -23,6 +23,10 @@ from skills.transaction_understanding.pipeline import process_transaction
 from skills.financial_intelligence.pipeline import run_financial_analysis
 from skills.financial_intelligence.behavior_pipeline import run_behavior_analysis
 from skills.reasoning_layer.pipeline import run_financial_coach
+from skills.knowledge_layer.database import init_db
+from skills.knowledge_layer.crud import get_all_overrides, upsert_override
+
+init_db()
 from skills.reporting_layer.pipeline import run_report_generation
 from skills.data_ingestion.balance_inference import extract_balances_from_csv
 from skills.core.orchestrator import run_pipeline
@@ -114,12 +118,19 @@ if "total_assets" not in st.session_state:
 if "total_liabilities" not in st.session_state:
     st.session_state["total_liabilities"] = 0.0
 if "overrides" not in st.session_state:
-    st.session_state["overrides"] = {
-        "KALUKUMAR1": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
-        "KALULA": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
-        "KALULAL K": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
-        "MUSKAN TRADERS": {"transaction_type": "Expense", "category": "Food", "sub_category": "Groceries", "merchant_name": "Muskan Traders"}
-    }
+    db_overrides = get_all_overrides()
+    if not db_overrides:
+        initial_seeds = {
+            "KALUKUMAR1": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
+            "KALULA": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
+            "KALULAL K": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
+            "MUSKAN TRADERS": {"transaction_type": "Expense", "category": "Food", "sub_category": "Groceries", "merchant_name": "Muskan Traders"}
+        }
+        for desc, data in initial_seeds.items():
+            upsert_override(desc, data["merchant_name"], data["transaction_type"], data["category"], data["sub_category"])
+        st.session_state["overrides"] = initial_seeds
+    else:
+        st.session_state["overrides"] = db_overrides
 if "raw_txs" not in st.session_state:
     st.session_state["raw_txs"] = []
 if "audit_completed" not in st.session_state:
@@ -861,13 +872,14 @@ if st.session_state["audit_completed"]:
                 raw_desc = row["Raw Description"]
                 clean_desc = clean_transaction_description(raw_desc)
                 
-                # Save mapping to overrides dict
+                # Save mapping to overrides dict and database
                 st.session_state["overrides"][clean_desc] = {
-                    "category": new_cat,
-                    "sub_category": new_sub,
                     "merchant_name": row["Clean Merchant"],
-                    "transaction_type": row["Type"]
+                    "transaction_type": row["Type"],
+                    "category": new_cat,
+                    "sub_category": new_sub
                 }
+                upsert_override(clean_desc, row["Clean Merchant"], row["Type"], new_cat, new_sub)
                 
         if has_changes:
             st.toast("⚡ Categories updated! Restarting analysis...")
