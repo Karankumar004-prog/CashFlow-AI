@@ -54,7 +54,7 @@ def run_behavior_analysis(state: StateDict) -> StateDict:
     state.processed_data["behavior"]["people_summary"] = people_summary
     
     # Detect deterministic recurring payments
-    recurring_bills = detect_recurring_transactions(state.processed_data["transactions"])
+    recurring_bills = detect_recurring_transactions(transactions)
     state.processed_data["behavior"]["recurring_bills"] = recurring_bills
     
     return state

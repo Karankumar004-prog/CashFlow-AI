@@ -132,6 +132,24 @@ def run_report_generation(state: StateDict) -> str:
         lines.append("- No weekly spending data available.")
     lines.append("")
     
+    # Deterministic Recurring Subscriptions
+    lines.append("### Detected Recurring Subscriptions")
+    lines.append("")
+    recurring_bills = behavior.get("recurring_bills", [])
+    if isinstance(recurring_bills, list) and recurring_bills:
+        currency_symbol = state.raw_data.get("currency_symbol", "$")
+        lines.append("| Merchant | Est. Amount | Frequency | Occurrences |")
+        lines.append("| :--- | :--- | :--- | :--- |")
+        for bill in recurring_bills:
+            merchant = bill.get("merchant", "Unknown")
+            amt = bill.get("amount", 0.0)
+            freq = bill.get("frequency", "Unknown")
+            occ = bill.get("occurrences", 0)
+            lines.append(f"| **{merchant}** | {currency_symbol}{amt:,.2f} | {freq} | {occ}x |")
+    else:
+        lines.append("- No recurring subscriptions deterministically detected.")
+    lines.append("")
+    
     # Category Transparency
     lines.append("### Category Transparency (Merchants mapped per category)")
     lines.append("")
