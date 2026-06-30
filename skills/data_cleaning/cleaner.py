@@ -48,10 +48,14 @@ def clean_transaction_description(raw_description: str) -> str:
                     name = vpa.split('@')[0]
                 desc = name
                 
-            # Clean leading digits only if followed by a space (preserves raw phone numbers)
+            # Clean leading digits only if followed by a space
             cleaned_desc = re.sub(r'^\d+\s+', '', desc)
             if cleaned_desc.strip() != "":
                 desc = cleaned_desc
+
+            # NEW: If the resulting name is entirely digits, label it contextually
+            if desc.replace(' ', '').replace('-', '').isdigit():
+                desc = "Unknown UPI Contact"
 
     # 2. NEFT / IMPS / RTGS / ACH
     elif desc.startswith("NEFT"):

@@ -119,18 +119,7 @@ if "total_liabilities" not in st.session_state:
     st.session_state["total_liabilities"] = 0.0
 if "overrides" not in st.session_state:
     db_overrides = get_all_overrides()
-    if not db_overrides:
-        initial_seeds = {
-            "KALUKUMAR1": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
-            "KALULA": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
-            "KALULAL K": {"transaction_type": "Transfer", "category": "Transfer", "sub_category": "Self", "merchant_name": "Father"},
-            "MUSKAN TRADERS": {"transaction_type": "Expense", "category": "Food", "sub_category": "Groceries", "merchant_name": "Muskan Traders"}
-        }
-        for desc, data in initial_seeds.items():
-            upsert_override(desc, data["merchant_name"], data["transaction_type"], data["category"], data["sub_category"])
-        st.session_state["overrides"] = initial_seeds
-    else:
-        st.session_state["overrides"] = db_overrides
+    st.session_state["overrides"] = db_overrides if db_overrides else {}
 if "raw_txs" not in st.session_state:
     st.session_state["raw_txs"] = []
 if "audit_completed" not in st.session_state:
