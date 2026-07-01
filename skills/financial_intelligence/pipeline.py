@@ -24,7 +24,15 @@ def run_financial_analysis(
             
     # 2. Extract monthly income if not manually specified in state raw_data
     # We no longer rely on declared_income from raw_data
-    monthly_income = sum(abs(tx.amount) for tx in transactions if tx.transaction_type.lower() == "income")
+    total_income = sum(abs(tx.amount) for tx in transactions if tx.transaction_type.lower() == "income")
+    if transactions:
+        min_date = min(tx.date for tx in transactions)
+        max_date = max(tx.date for tx in transactions)
+        days_covered = (max_date - min_date).days
+        months_covered = max(1.0, days_covered / 30.0) # Assume at least 1 month
+        monthly_income = total_income / months_covered
+    else:
+        monthly_income = 0.0
     
     # 3. Fetch assets & liabilities from raw_data if not directly passed in signature
     state_assets = state.raw_data.get("assets", [])

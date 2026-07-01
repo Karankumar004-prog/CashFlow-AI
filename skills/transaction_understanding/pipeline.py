@@ -64,22 +64,16 @@ def _map_csv_metadata(raw_tx: RawTransaction):
             mapped_cat = TransactionCategory.ENTERTAINMENT
         elif c_low in ['salary', 'freelance', 'business', 'dividends', 'interest', 'bonus']:
             mapped_cat = TransactionCategory.INCOME
+            if c_low == 'dividends':
+                mapped_type = TransactionType.INCOME
         elif c_low in ['savings', 'investments', 'investing', 'mutual funds', 'stocks']:
             mapped_cat = TransactionCategory.INVESTMENT
+            if c_low in ['investing', 'investments']:
+                mapped_type = TransactionType.INVESTMENT
         elif c_low in ['lending', 'loan', 'emi', 'mortgage', 'debt']:
             mapped_cat = TransactionCategory.LOAN_DEBT
-
-    if raw_tx.csv_category:
-        c_low = raw_tx.csv_category.lower()
-        if c_low in ['investing', 'investments']:
-            mapped_type = TransactionType.INVESTMENT
-            mapped_cat = TransactionCategory.INVESTMENT
-        elif c_low == 'dividends':
-            mapped_type = TransactionType.INCOME
-            mapped_cat = TransactionCategory.INCOME
-        elif c_low == 'lending':
-            mapped_type = TransactionType.LOAN_DEBT
-            mapped_cat = TransactionCategory.LOAN_DEBT
+            if c_low == 'lending':
+                mapped_type = TransactionType.LOAN_DEBT
             
     return mapped_type, mapped_cat
 

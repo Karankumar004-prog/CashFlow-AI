@@ -29,14 +29,10 @@ def run_pipeline(raw_txs, overrides, api_key, liquid_assets, total_assets, total
     ai_mappings = {}
     if unknown_descriptions and api_key and api_key != "mock":
         try:
-            import streamlit as st
             from skills.transaction_understanding.ai import batch_classify_transactions
-            st.info(f"🧠 Asking AI to categorize {len(unknown_descriptions)} unknown merchants...")
             ai_mappings = batch_classify_transactions(list(unknown_descriptions), api_key=api_key)
         except Exception as e:
-            import streamlit as st
-            st.error(f"❌ AI Categorization Failed: {e}")
-            st.stop() # Force a hard stop so the user sees the error
+            raise RuntimeError(f"AI Categorization Failed: {e}")
             
     # E. Apply AI Mappings
     final_transactions = []

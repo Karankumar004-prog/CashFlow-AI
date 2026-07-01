@@ -125,9 +125,28 @@ if "report_md" not in st.session_state:
 if "last_run_params" not in st.session_state:
     st.session_state["last_run_params"] = None
 
+if "analysis_cache" not in st.session_state:
+    st.session_state["analysis_cache"] = {} # Maps file_hash -> completed state
+if "job_history" not in st.session_state:
+    st.session_state["job_history"] = []
+if "current_file_hash" not in st.session_state:
+    st.session_state["current_file_hash"] = None
+
 # -------------------------------------------------------------
 # 5. Sidebar Inputs
 # -------------------------------------------------------------
+st.sidebar.markdown("### 🔄 Session Management")
+if st.sidebar.button("Start New Analysis", type="secondary"):
+    st.session_state["audit_status"] = "IDLE"
+    st.session_state["audit_stage"] = 0
+    st.session_state["audit_partial_data"] = {}
+    st.session_state["state"] = None
+    st.session_state["raw_txs"] = []
+    st.session_state["report_md"] = ""
+    st.session_state["audit_completed"] = False
+    st.session_state["current_file_hash"] = None
+    st.rerun()
+
 st.sidebar.markdown("### 🔑 Configuration")
 api_key = st.sidebar.text_input(
     "Gemini API Key",
@@ -236,6 +255,21 @@ if uploaded_file is not None:
         run_btn = st.button("Run Financial Audit", type="primary")
         
         if run_btn:
+            import hashlib
+            file_bytes = uploaded_file.getvalue()
+            file_hash = hashlib.sha256(file_bytes).hexdigest()
+            st.session_state["current_file_hash"] = file_hash
+
+            # Check cache BEFORE initializing state machine
+            if file_hash in st.session_state["analysis_cache"]:
+                st.toast("⚡ Cached analysis found! Loading deterministic results in 0.1s...")
+                cached_data = st.session_state["analysis_cache"][file_hash]
+                st.session_state["state"] = cached_data["state"]
+                st.session_state["report_md"] = cached_data["report_md"]
+                st.session_state["audit_status"] = "COMPLETED"
+                st.session_state["audit_completed"] = True
+                st.rerun()
+
             # Initialize State Machine
             st.session_state["audit_status"] = "RUNNING"
             st.session_state["audit_stage"] = 0
@@ -363,7 +397,14 @@ if uploaded_file is not None:
                     progress_placeholder = st.empty()
                     
                     for i, chunk in enumerate(chunks):
-                        progress_placeholder.info(f"🧠 AI Categorization: Processing chunk {i+1} of {len(chunks)}...")
+                        import time
+                        if i > 0:
+                            avg_chunk_time = (time.time() - st.session_state["audit_partial_data"].get("ai_start_time", time.time())) / i
+                            eta_seconds = int(avg_chunk_time * (len(chunks) - i))
+                            progress_placeholder.info(f"🧠 AI Categorization: Processing chunk {i+1} of {len(chunks)}... (ETA: ~{eta_seconds}s)")
+                        else:
+                            st.session_state["audit_partial_data"]["ai_start_time"] = time.time()
+                            progress_placeholder.info(f"🧠 AI Categorization: Processing chunk {i+1} of {len(chunks)}... (Estimating time...)")
                         try:
                             chunk_mappings, chunk_usage = batch_classify_transactions(chunk, api_key)
                             all_mappings.update(chunk_mappings)
@@ -509,6 +550,15 @@ if uploaded_file is not None:
                     "api_key": api_key,
                     "currency_symbol": selected_symbol
                 }
+
+                file_hash = st.session_state.get("current_file_hash")
+                if file_hash:
+                    st.session_state["analysis_cache"][file_hash] = {
+                        "state": state,
+                        "report_md": report_md
+                    }
+                    st.session_state["job_history"].append(file_hash)
+
                 calculated_income = state.processed_data["ratios"].get("total_absolute_income", state.processed_data["ratios"].get("monthly_income", 0.0))
                 if was_cancelled:
                     st.warning(f"⚠️ Audit Cancelled gracefully. Partial results loaded.")
