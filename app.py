@@ -351,7 +351,11 @@ if uploaded_file is not None:
                 for tx in raw_txs:
                     ptx = process_transaction(tx, overrides_dict=state.user_memory.get("overrides", {}))
                     if ptx.confidence_score <= 0.0:
-                        unknown_tx_map[ptx.raw_description] = {
+                        direction = "inflow" if ptx.amount > 0 else "outflow"
+                        signature = f"{ptx.raw_description}:::{direction}"
+                        
+                        unknown_tx_map[signature] = {
+                            "signature": signature,
                             "description": ptx.raw_description, 
                             "amount": ptx.amount,
                             "csv_type": tx.csv_type,
@@ -366,8 +370,11 @@ if uploaded_file is not None:
                     st.session_state["audit_stage"] = 6
                     st.rerun()
                 
-                unknown_list = list(unknown_tx_map.values())
-                chunk_size = 50
+                if "ai_checkpoint_cache" not in st.session_state:
+                    st.session_state["ai_checkpoint_cache"] = {}
+                    
+                unknown_list = [tx for tx in unknown_tx_map.values() if tx["signature"] not in st.session_state["ai_checkpoint_cache"]]
+                chunk_size = 20
                 chunks = [unknown_list[i:i + chunk_size] for i in range(0, len(unknown_list), chunk_size)]
                 
                 st.session_state["audit_partial_data"]["ai_chunks"] = chunks
@@ -407,6 +414,8 @@ if uploaded_file is not None:
                             progress_placeholder.info(f"🧠 AI Categorization: Processing chunk {i+1} of {len(chunks)}... (Estimating time...)")
                         try:
                             chunk_mappings, chunk_usage = batch_classify_transactions(chunk, api_key)
+                            
+                            st.session_state["ai_checkpoint_cache"].update(chunk_mappings)
                             all_mappings.update(chunk_mappings)
                             
                             prompt_per_tx = chunk_usage.get("promptTokenCount", 0) // len(chunk) if chunk else 0
@@ -421,13 +430,15 @@ if uploaded_file is not None:
                                     "candidates_tokens": cand_per_tx
                                 }
                             if i < len(chunks) - 1:
-                                time.sleep(4)
+                                time.sleep(3)
                         except Exception as e:
                             import streamlit as st
-                            st.toast(f"⚠️ AI Categorization Failed on chunk {i+1}: {e}. Proceeding with what we have.")
+                            st.error(f"AI Pipeline paused due to API Limit or Error (Chunk {i+1}): {e}")
+                            st.warning("Previous chunks were saved successfully! Please wait a moment and click 'Analyze' again to resume.")
+                            st.stop()
                             
                     progress_placeholder.empty()
-                    st.session_state["audit_partial_data"]["ai_mappings"].update(all_mappings)
+                    st.session_state["audit_partial_data"]["ai_mappings"] = st.session_state["ai_checkpoint_cache"]
                 
                 st.session_state["audit_stage"] = 2.2
                 st.rerun()
@@ -439,8 +450,11 @@ if uploaded_file is not None:
                 
                 final_transactions = []
                 for ptx in first_pass_txs:
-                    if ptx.confidence_score <= 0.0 and ptx.raw_description in ai_mappings:
-                        ai_data = ai_mappings[ptx.raw_description]
+                    direction = "inflow" if ptx.amount > 0 else "outflow"
+                    signature = f"{ptx.raw_description}:::{direction}"
+                    
+                    if ptx.confidence_score <= 0.0 and signature in ai_mappings:
+                        ai_data = ai_mappings[signature]
                         proposed_type = ai_data.get("transaction_type", ptx.transaction_type)
                         if ptx.amount > 0 and proposed_type not in ["Income", "Refund", "Transfer", "Loan/Debt"]:
                             proposed_type = "Income"
@@ -452,12 +466,14 @@ if uploaded_file is not None:
                         ptx.clean_merchant = ai_data.get("clean_merchant", ptx.clean_merchant)
                         if "associated_person" in ai_data and ai_data["associated_person"]:
                             ptx.associated_person = ai_data["associated_person"]
-                        from skills.transaction_understanding.rules import derive_intent_and_impact
-                        ptx.intent, ptx.financial_impact = derive_intent_and_impact(ptx.category, ptx.sub_category)
+                            
+                        from skills.transaction_understanding.pipeline import enrich_transaction_metadata
+                        ptx = enrich_transaction_metadata(ptx)
+                        
                         ptx.confidence_score = 0.8
                         ptx.classification_method = "ai_fallback"
                         
-                        usage = st.session_state["audit_partial_data"].get("ai_usage", {}).get(ptx.raw_description, {})
+                        usage = st.session_state["audit_partial_data"].get("ai_usage", {}).get(signature, {})
                         ptx.prompt_tokens = usage.get("prompt_tokens", 0)
                         ptx.candidates_tokens = usage.get("candidates_tokens", 0)
                     final_transactions.append(ptx)
@@ -633,7 +649,8 @@ if st.session_state["audit_completed"]:
     state = st.session_state["state"]
     report_md = st.session_state["report_md"]
     
-    score = state.processed_data["financial_health_score"]
+    health_score_data = state.processed_data["financial_health_score"]
+    score = health_score_data["total"] if isinstance(health_score_data, dict) else health_score_data
     ratios = state.processed_data["ratios"]
     behavior = state.processed_data["behavior"]
     quick_wins = state.agent_outputs.get("quick_wins", [])

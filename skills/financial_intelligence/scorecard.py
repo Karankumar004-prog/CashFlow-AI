@@ -1,4 +1,4 @@
-def compute_health_score(ratios: dict) -> float:
+def compute_health_score(ratios: dict) -> dict:
     """
     Computes a deterministic Financial Health Score (0-100) based on four component ratios:
     Savings Rate (25pt), Debt Ratio (25pt), Emergency Runway (25pt), Asset Coverage (25pt).
@@ -44,4 +44,14 @@ def compute_health_score(ratios: dict) -> float:
     total_score = savings_score + debt_score + runway_score + asset_score
     
     # Clamp total score between 0.0 and 100.0
-    return max(0.0, min(100.0, total_score))
+    total_score = max(0.0, min(100.0, total_score))
+    
+    return {
+        "total": total_score,
+        "breakdown": {
+            "Savings": savings_score,
+            "Debt": debt_score,
+            "Runway": runway_score,
+            "Assets": asset_score
+        }
+    }

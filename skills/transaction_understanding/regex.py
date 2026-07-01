@@ -40,13 +40,17 @@ def match_regex_patterns(
     ]
     
     for pattern, merchant, tx_type, category, sub_category in patterns:
-        if re.search(pattern, clean_desc, re.IGNORECASE):
+        match = re.search(pattern, clean_desc, re.IGNORECASE)
+        if match:
             # If merchant is None, extract from description (strip the matched prefix)
             resolved_merchant = merchant
             if resolved_merchant is None:
-                # Strip the matched keyword and clean up
-                stripped = re.sub(pattern, '', clean_desc, flags=re.IGNORECASE).strip()
-                resolved_merchant = stripped.title() if stripped else actual_raw.title()
+                # Use the matched group if it exists, otherwise strip pattern
+                if match.groups():
+                    resolved_merchant = match.group(1).title()
+                else:
+                    stripped = re.sub(pattern, '', clean_desc, flags=re.IGNORECASE).strip()
+                    resolved_merchant = stripped.title() if stripped else actual_raw.title()
             return ProcessedTransaction(
                 date=actual_date,
                 raw_description=actual_raw,

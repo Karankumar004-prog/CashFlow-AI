@@ -8,7 +8,8 @@ def run_financial_coach(state: StateDict, api_key: str = None) -> StateDict:
     Updates the state's agent_outputs with the generated Quick Wins and Roadmap.
     """
     # 1. Extract values from state
-    score = state.processed_data.get("financial_health_score", 0.0)
+    score_data = state.processed_data.get("financial_health_score", 0.0)
+    score = score_data.get("total", 0.0) if isinstance(score_data, dict) else score_data
     ratios = state.processed_data.get("ratios", {})
     
     behavior = state.processed_data.get("behavior", {})

@@ -12,7 +12,15 @@ def detect_recurring_transactions(transactions: List[ProcessedTransaction]) -> L
     recurring_items = []
 
     for merchant, txs in groups.items():
-        if len(txs) < 2: continue
+        if len(txs) < 2:
+            recurring_items.append({
+                "merchant": merchant,
+                "amount": abs(txs[0].amount),
+                "frequency": "Potential Recurring",
+                "occurrences": 1,
+                "category": txs[0].category
+            })
+            continue
 
         txs.sort(key=lambda x: x.date)
 

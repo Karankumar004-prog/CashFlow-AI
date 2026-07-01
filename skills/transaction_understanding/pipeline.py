@@ -2,7 +2,7 @@ import json
 import urllib.request
 import urllib.error
 from skills.core.models import RawTransaction, ProcessedTransaction
-from skills.data_cleaning.cleaner import clean_transaction_description
+from skills.data_cleaning.cleaner import clean_transaction_description, normalize_merchant
 from skills.transaction_understanding import rules
 from skills.transaction_understanding import regex
 from skills.knowledge_layer import memory
@@ -123,6 +123,7 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
         allowed_types = [TransactionType.EXPENSE, TransactionType.INVESTMENT, TransactionType.TRANSFER, TransactionType.LOAN_DEBT]
         
     clean_desc = clean_transaction_description(raw_tx.raw_description)
+    clean_desc = normalize_merchant(clean_desc)
     
     # 2 & 3 & 4. Match Extract Merchant & Assign Category
     ptx = None
@@ -144,25 +145,29 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
             classification_method="csv_metadata",
             csv_category=raw_tx.csv_category,
             csv_type=raw_tx.csv_type,
-            running_balance=raw_tx.running_balance
+            running_balance=raw_tx.running_balance,
+            classification_reason="Mapped from CSV metadata."
         )
         
     # Stage B: User memory override (Highest Priority)
     mem_match = memory.match_user_memory(clean_desc, overrides_dict, amount, raw_tx.date, raw_tx.raw_description)
     if mem_match:
         ptx = mem_match
+        ptx.classification_reason = "Matched user-defined memory rule."
         
     # Stage C: Exact rules
     if not ptx:
         rule_match = rules.match_exact_rule(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
         if rule_match:
             ptx = rule_match
+            ptx.classification_reason = "Exact rule match."
             
     # Stage D: Regex patterns
     if not ptx:
         regex_match = regex.match_regex_patterns(clean_desc, amount, raw_tx.date, raw_tx.raw_description)
         if regex_match:
             ptx = regex_match
+            ptx.classification_reason = "Regex pattern match."
             
     # Note: Stage E (AI Fallback) is executed asynchronously in app.py
         
@@ -185,8 +190,9 @@ def process_transaction(raw_tx: RawTransaction, overrides_dict: dict) -> Process
             category=category,
             intent=rules.derive_intent_and_impact(category, "Uncategorized")[0],
             financial_impact=rules.derive_intent_and_impact(category, "Uncategorized")[1],
-            confidence_score=0.0,
-            classification_method="default"
+            confidence_score=0.18,
+            classification_method="default",
+            classification_reason="Fallback logic, unknown merchant."
         )
         
     # Apply direction restrictions to whatever we matched

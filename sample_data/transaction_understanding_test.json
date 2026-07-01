@@ -146,7 +146,7 @@
       "transaction_type": "Expense",
       "category": "Other",
       "merchant_name": "unknown merchandise pos #92049",
-      "confidence_score": 0.0
+      "confidence_score": 0.18
     }
   },
   {
@@ -156,7 +156,7 @@
       "transaction_type": "Income",
       "category": "Income",
       "merchant_name": "mystery inflow credit",
-      "confidence_score": 0.0
+      "confidence_score": 0.18
     }
   },
   {

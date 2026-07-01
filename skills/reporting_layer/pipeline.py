@@ -6,7 +6,8 @@ def run_report_generation(state: StateDict) -> str:
     into a comprehensive, print-ready Markdown report.
     """
     # 1. Extract state details
-    score = state.processed_data.get("financial_health_score", 0.0)
+    score_data = state.processed_data.get("financial_health_score", 0.0)
+    score = score_data.get("total", 0.0) if isinstance(score_data, dict) else score_data
     ratios = state.processed_data.get("ratios", {})
     behavior = state.processed_data.get("behavior", {})
     concentrations = behavior.get("category_concentration", [])

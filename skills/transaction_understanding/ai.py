@@ -6,8 +6,8 @@ from typing import List
 def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
     """
     Sends a batch of unknown transactions to Gemini 2.5 Flash for categorization.
-    Expects transactions to be a list of dicts: [{'description': '...', 'amount': 123.45}]
-    Returns a dictionary mapping raw descriptions to their AI-classified properties.
+    Expects transactions to be a list of dicts: [{'signature': '...', 'description': '...', 'amount': 123.45}]
+    Returns a dictionary mapping raw descriptions (signatures) to their AI-classified properties.
     """
     if not api_key or api_key == "mock":
         return {}
@@ -15,9 +15,9 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     
     system_instruction = (
-        "You are a transaction classifier. I will provide a JSON list of transactions with 'description', 'amount', and sometimes 'csv_type' and 'csv_category'. "
-        "Return a JSON dictionary where the keys are the exact raw descriptions, and the values are objects "
-        "containing {'transaction_type': '...', 'category': '...', 'sub_category': '...', 'clean_merchant': '...', 'associated_person': '...'}.\n\n"
+        "You are a transaction classifier. I will provide a JSON list of transactions with 'signature', 'description', 'amount', and sometimes 'csv_type' and 'csv_category'. "
+        "Return a JSON ARRAY of objects. Each object MUST contain the 'signature' provided in the input, "
+        "along with its classification fields: 'transaction_type', 'category', 'sub_category', 'clean_merchant', and 'associated_person'.\n\n"
         "USE THE CSV METADATA: If the bank provided a 'csv_category' or 'csv_type', use it as a strong hint for your classification.\n\n"
         "CRITICAL RULE: MONEY DIRECTION COMES FIRST:\n"
         "- If amount > 0 (Positive Cash Flow), 'transaction_type' MUST be exactly one of: ['Income', 'Refund', 'Transfer', 'Loan/Debt']\n"
@@ -62,13 +62,29 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
             ]
         },
         "generationConfig": {
-            "responseMimeType": "application/json"
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "ARRAY",
+                "description": "List of transaction classifications.",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "signature": {"type": "STRING"},
+                        "transaction_type": {"type": "STRING"},
+                        "category": {"type": "STRING"},
+                        "sub_category": {"type": "STRING"},
+                        "clean_merchant": {"type": "STRING"},
+                        "associated_person": {"type": "STRING", "nullable": True}
+                    },
+                    "required": ["signature", "transaction_type", "category", "sub_category", "clean_merchant"]
+                }
+            }
         }
     }
     
     import time
     
-    max_retries = 4
+    max_retries = 5
     for attempt in range(max_retries):
         try:
             data = json.dumps(payload).encode("utf-8")
@@ -92,7 +108,12 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
                 clean_text = clean_text.strip()
                 
                 try:
-                    result_dict = json.loads(clean_text)
+                    # Parse the array returned by Gemini
+                    result_list = json.loads(clean_text)
+                    
+                    # Convert the array of objects back into a dictionary mapping the signature to the data
+                    result_dict = {item["signature"]: item for item in result_list if "signature" in item}
+                    
                 except json.JSONDecodeError as e:
                     print(f"JSON Parse Error. Raw output: {clean_text}")
                     raise RuntimeError(f"AI returned invalid JSON: {e}")
@@ -104,9 +125,16 @@ def batch_classify_transactions(transactions: List[dict], api_key: str) -> dict:
                 }
                 
                 return result_dict, usage_dict
+                
         except urllib.error.HTTPError as e:
-            if e.code in [503, 500, 429, 504] and attempt < max_retries - 1:
-                time.sleep((2 ** attempt) + 1)  # Exponential backoff: 2s, 3s, 5s, 9s
+            if e.code == 429 and attempt < max_retries - 1:
+                # If Too Many Requests, wait significantly longer (e.g., 15s, 30s, 60s)
+                sleep_time = 15 * (attempt + 1)
+                time.sleep(sleep_time)
+                continue
+            elif e.code in [503, 500, 504] and attempt < max_retries - 1:
+                # Standard backoff for server errors
+                time.sleep((2 ** attempt) + 1)
                 continue
             raise RuntimeError(f"API Call failed: HTTP Error {e.code}: {e.reason}")
         except Exception as e:

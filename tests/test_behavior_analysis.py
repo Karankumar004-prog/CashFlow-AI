@@ -272,9 +272,9 @@ def test_weekly_spending_and_transparency():
     
     weekly = calculate_weekly_spending(txs)
     assert len(weekly) == 3
-    assert weekly[0] == {"week_number": 23, "total_spent": 1050.0}
-    assert weekly[1] == {"week_number": 24, "total_spent": 15.0}
-    assert weekly[2] == {"week_number": 25, "total_spent": 200.0}
+    assert weekly[0] == {"week_number": "2026-W23", "total_spent": 1050.0}
+    assert weekly[1] == {"week_number": "2026-W24", "total_spent": 15.0}
+    assert weekly[2] == {"week_number": "2026-W25", "total_spent": 200.0}
     
     transparency = get_category_transparency(txs)
     assert transparency["Needs > Housing"] == ["Rent"]

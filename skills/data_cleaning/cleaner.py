@@ -127,3 +127,16 @@ def clean_transaction_description(raw_description: str) -> str:
         
     desc = re.sub(r"\s+", " ", desc)
     return desc.strip()
+
+
+def normalize_merchant(merchant: str) -> str:
+    """
+    Normalizes specific merchants before matching to consolidate identical vendors.
+    E.g., 'TJSB Bank' or 'TJSB Via' -> 'TJSB'.
+    """
+    if not merchant:
+        return ""
+        
+    normalized = re.sub(r"\b(BANK|VIA|LLC|INC|CORP|LTD)\b", "", merchant, flags=re.IGNORECASE)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized

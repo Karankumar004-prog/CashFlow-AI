@@ -50,14 +50,7 @@ def calculate_ratios(
     avg_debt = abs_debt_txs / safe_months
     avg_investment = abs_investment_txs / safe_months
     avg_refund = abs_refund_txs / safe_months
-    
-    # Pure expenses that are not wealth-building
-    avg_non_wealth_outflows = avg_expenses + avg_debt
-
-    if avg_income > 0:
-        savings_rate = (avg_income + avg_refund - avg_non_wealth_outflows) / avg_income
-    else:
-        savings_rate = 0.0
+    # Legacy calculation logic for savings rate has been moved to the bottom
         
     # 3. Debt Ratio (DTI) Calculation
     if avg_income > 0:
@@ -94,6 +87,11 @@ def calculate_ratios(
     total_inflows = abs_income_txs + abs_refund_txs
     
     net_absolute_cash_flow = total_inflows - total_outflows
+    
+    if total_inflows > 0:
+        savings_rate = net_absolute_cash_flow / total_inflows
+    else:
+        savings_rate = 0.0
         
     return {
         "savings_rate": savings_rate,

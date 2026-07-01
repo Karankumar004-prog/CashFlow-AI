@@ -59,7 +59,7 @@ def test_pipeline_fallback_expense():
     assert res.clean_merchant == "unknown merchandise pos #92049"
     assert res.transaction_type == "Expense"
     assert res.category == "Other"
-    assert res.confidence_score == 0.0
+    assert res.confidence_score == 0.18
 
 def test_pipeline_fallback_income():
     tx = RawTransaction(
@@ -72,7 +72,7 @@ def test_pipeline_fallback_income():
     assert res.clean_merchant == "mystery inflow credit"
     assert res.transaction_type == "Income"
     assert res.category == "Income"
-    assert res.confidence_score == 0.0
+    assert res.confidence_score == 0.18
 
 def test_pipeline_ai_fallback():
     tx = RawTransaction(
@@ -83,7 +83,7 @@ def test_pipeline_ai_fallback():
     res = process_transaction(tx, {})
     assert res.classification_method == "default"
     assert res.category == "Other"
-    assert res.confidence_score == 0.0
+    assert res.confidence_score == 0.18
 
 def test_pipeline_telemetry():
     from app import run_pipeline

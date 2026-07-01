@@ -68,7 +68,7 @@ def test_scorecard_points():
         "emergency_runway_months": 8.0,
         "asset_coverage": 4.0
     }
-    assert compute_health_score(optimal) == 100.0
+    assert compute_health_score(optimal)["total"] == 100.0
     
     # Case 2: Intermediate scores -> Should score 50.0 (12.5pt each)
     intermediate = {
@@ -77,7 +77,7 @@ def test_scorecard_points():
         "emergency_runway_months": 3.0,  # (3 / 6) * 25 = 12.5
         "asset_coverage": 2.0            # ((2.0 - 1.0) / 2.0) * 25 = 12.5
     }
-    assert compute_health_score(intermediate) == 50.0
+    assert compute_health_score(intermediate)["total"] == 50.0
     
     # Case 3: Extreme poor scores -> Should score 0
     poor = {
@@ -86,7 +86,7 @@ def test_scorecard_points():
         "emergency_runway_months": 0.0,
         "asset_coverage": 0.5
     }
-    assert compute_health_score(poor) == 0.0
+    assert compute_health_score(poor)["total"] == 0.0
 
 def test_pipeline_integration():
     state = StateDict()
@@ -158,4 +158,4 @@ def test_pipeline_integration():
     # Runway: (2/6) * 25 = 8.33pt
     # Asset: ((2.0-1.0)/2.0) * 25 = 12.5pt
     # Total: 25 + 21.43 + 8.33 + 12.5 = 67.26
-    assert 67.0 < score < 67.5
+    assert 67.0 < score["total"] < 67.5
