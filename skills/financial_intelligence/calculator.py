@@ -44,11 +44,12 @@ def calculate_ratios(
     abs_refund_txs = sum(abs(tx.amount) for tx in transactions if tx.transaction_type.lower() == "refund")
 
     # Normalize to per-month averages for ratios
-    avg_income = abs_income_txs / months_covered
-    avg_expenses = abs_total_expenses / months_covered
-    avg_debt = abs_debt_txs / months_covered
-    avg_investment = abs_investment_txs / months_covered
-    avg_refund = abs_refund_txs / months_covered
+    safe_months = max(months_covered, 1.0)
+    avg_income = abs_income_txs / safe_months
+    avg_expenses = abs_total_expenses / safe_months
+    avg_debt = abs_debt_txs / safe_months
+    avg_investment = abs_investment_txs / safe_months
+    avg_refund = abs_refund_txs / safe_months
     
     # Pure expenses that are not wealth-building
     avg_non_wealth_outflows = avg_expenses + avg_debt
@@ -72,7 +73,7 @@ def calculate_ratios(
         or tx.transaction_type.lower() == "loan/debt"
         or getattr(tx, 'intent', '').lower() == "debt payment"
     )
-    avg_essential_expenses = abs_essential_expenses / months_covered
+    avg_essential_expenses = abs_essential_expenses / safe_months
     
     if avg_essential_expenses > 0:
         emergency_runway = liquid_assets / avg_essential_expenses

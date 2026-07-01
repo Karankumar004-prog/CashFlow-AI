@@ -7,13 +7,7 @@ from datetime import date
 import sys
 import importlib
 
-# Force reload backend modules if they are already in sys.modules to prevent Streamlit cache stale signature bugs
-for module_name in list(sys.modules.keys()):
-    if module_name.startswith("skills"):
-        try:
-            importlib.reload(sys.modules[module_name])
-        except Exception:
-            pass
+# Removed dangerous importlib.reload loop to prevent Streamlit cache state issues
 
 # Import models, parsing, and pipeline orchestration functions
 from skills.core.models import StateDict, RawTransaction
@@ -220,9 +214,11 @@ if uploaded_file is not None:
                 temp_file.write(uploaded_file.getvalue())
                 temp_file_path = temp_file.name
             
-            inferred = extract_balances_from_csv(temp_file_path)
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
+            try:
+                inferred = extract_balances_from_csv(temp_file_path)
+            finally:
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
                 
             if inferred:
                 st.session_state["liquid_assets"] = inferred["liquid_assets"]
@@ -252,15 +248,16 @@ if uploaded_file is not None:
                 temp_file.write(uploaded_file.getvalue())
                 temp_file_path = temp_file.name
             
-            # Ingest and parse CSV transactions
-            raw_txs = parse_csv_to_models(temp_file_path)
-            
-            # Clean and deduplicate transactions
-            raw_txs = clean_transactions(raw_txs)
-
-            # Clean up temporary file
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
+            try:
+                # Ingest and parse CSV transactions
+                raw_txs = parse_csv_to_models(temp_file_path)
+                
+                # Clean and deduplicate transactions
+                raw_txs = clean_transactions(raw_txs)
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
             
             if not raw_txs:
                 st.error("No valid transactions found in the uploaded statement.")
@@ -276,7 +273,14 @@ if uploaded_file is not None:
         with col1:
             progress_fraction = st.session_state["audit_stage"] / 5.0
             if progress_fraction > 1.0: progress_fraction = 1.0
-            st.progress(progress_fraction, text=st.session_state["audit_progress_text"])
+            
+            import time
+            progress_text = st.session_state["audit_progress_text"]
+            if "start_time" in st.session_state.get("audit_partial_data", {}):
+                elapsed = time.perf_counter() - st.session_state["audit_partial_data"]["start_time"]
+                progress_text = f"{progress_text} (Elapsed: {elapsed:.1f}s)"
+                
+            st.progress(progress_fraction, text=progress_text)
         with col2:
             if st.session_state["audit_status"] == "RUNNING":
                 if st.button("🛑 Stop Audit", type="secondary"):
@@ -325,7 +329,7 @@ if uploaded_file is not None:
                 
                 if st.session_state["audit_status"] == "CANCELLING":
                     st.session_state["audit_partial_data"]["ai_mappings"] = {}
-                    st.session_state["audit_stage"] = 2.2
+                    st.session_state["audit_stage"] = 6
                     st.rerun()
                 
                 unknown_list = list(unknown_tx_map.values())
@@ -348,7 +352,7 @@ if uploaded_file is not None:
                 chunks = st.session_state["audit_partial_data"]["ai_chunks"]
                 
                 if st.session_state["audit_status"] == "CANCELLING":
-                    st.session_state["audit_stage"] = 2.2
+                    st.session_state["audit_stage"] = 6
                     st.rerun()
                 
                 if api_key and api_key != "mock":
@@ -421,7 +425,7 @@ if uploaded_file is not None:
                 st.session_state["audit_partial_data"]["state"] = state
                 
                 if st.session_state["audit_status"] == "CANCELLING":
-                    st.session_state["audit_stage"] = 3
+                    st.session_state["audit_stage"] = 6
                     st.rerun()
                 
                 st.session_state["audit_stage"] = 3
@@ -510,6 +514,32 @@ if uploaded_file is not None:
                     st.warning(f"⚠️ Audit Cancelled gracefully. Partial results loaded.")
                 else:
                     st.success(f"✅ Audit Completed! Detected Absolute Income: {selected_symbol}{calculated_income:,.2f}")
+                st.rerun()
+
+            elif stage == 6:
+                import time
+                end_time = time.perf_counter()
+                exec_time = end_time - st.session_state["audit_partial_data"]["start_time"]
+                
+                state = st.session_state["audit_partial_data"]["state"]
+                state.processed_data["telemetry"] = {
+                    "execution_time_sec": round(exec_time, 4),
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0,
+                    "estimated_cost_usd": 0.0
+                }
+                st.session_state["state"] = state
+                st.session_state["report_md"] = "### ⚠️ Audit Cancelled gracefully.\n\nNo report generated."
+                st.session_state["audit_completed"] = True
+                st.session_state["audit_status"] = "CANCELLED"
+                st.session_state["last_run_params"] = {
+                    "liquid": liquid_assets,
+                    "assets": total_assets,
+                    "liabilities": total_liabilities,
+                    "api_key": api_key,
+                    "currency_symbol": selected_symbol
+                }
+                st.warning(f"⚠️ Audit Cancelled cleanly after {exec_time:.1f}s.")
                 st.rerun()
 
         except Exception as e:

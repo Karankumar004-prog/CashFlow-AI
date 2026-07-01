@@ -27,7 +27,20 @@ def parse_pdf_to_csv_file(pdf_file_path: str, api_key: str) -> str:
         )
 
         model = genai.GenerativeModel("gemini-1.5-pro")
-        response = model.generate_content([uploaded_file, prompt])
+        
+        import time
+        max_retries = 4
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content([uploaded_file, prompt])
+                break
+            except Exception as e:
+                # Catch all generic exceptions which includes google.api_core.retry.RetryError and ResourceExhausted
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt + 2)
+                    continue
+                raise RuntimeError(f"Gemini API rate limit or processing failed permanently after {max_retries} attempts: {e}")
         
         csv_text = response.text
         
@@ -40,13 +53,8 @@ def parse_pdf_to_csv_file(pdf_file_path: str, api_key: str) -> str:
             csv_text = csv_text[:csv_text.rfind("```")]
         
         csv_text = csv_text.strip()
-
-        # Save to temp CSV
-        fd, temp_csv_path = tempfile.mkstemp(suffix=".csv")
-        with os.fdopen(fd, 'w') as f:
-            f.write(csv_text)
-            
-        return temp_csv_path
+        
+        return csv_text
 
     finally:
         # ALWAYS delete the file from the API to maintain user privacy

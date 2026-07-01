@@ -164,8 +164,9 @@ def calculate_weekly_spending(transactions: List[ProcessedTransaction]) -> List[
         
     weekly_totals = {}
     for tx in expenses:
-        week_num = tx.date.isocalendar()[1]
-        weekly_totals[week_num] = weekly_totals.get(week_num, 0.0) + abs(tx.amount)
+        iso_year, iso_week, _ = tx.date.isocalendar()
+        week_key = f"{iso_year}-W{iso_week:02d}"
+        weekly_totals[week_key] = weekly_totals.get(week_key, 0.0) + abs(tx.amount)
         
     weekly_spending = []
     for week_num, total in weekly_totals.items():
